@@ -47,27 +47,28 @@ func NewRemoveCLICommand(ctx context.Context) *cli.Command {
 
 // REMOVE Command
 func (cmd *removeContext) remove(c *cli.Context) error {
+	message := docker.RemoveMessage{}
 	// get random
-	random := c.GlobalBool("random")
+	message.Random = c.GlobalBool("random")
 	// get dry-run mode
-	dryRun := c.GlobalBool("dry-run")
+	message.DryRun = c.GlobalBool("dry-run")
 	// get interval
-	interval := c.GlobalString("interval")
+	message.Interval = c.GlobalString("interval")
 	// get names or pattern
-	names, pattern := chaos.GetNamesOrPattern(c)
+	message.Names, message.Pattern = chaos.GetNamesOrPattern(c)
 	// get force flag
-	force := c.BoolT("force")
+	message.Force = c.BoolT("force")
 	// get links flag
-	links := c.BoolT("links")
+	message.Links = c.BoolT("links")
 	// get volumes flag
-	volumes := c.BoolT("volumes")
+	message.Volumes = c.BoolT("volumes")
 	// get limit for number of containers to remove
-	limit := c.Int("limit")
+	message.Limit = c.Int("limit")
 	// init remove command
-	removeCommand, err := docker.NewRemoveCommand(chaos.DockerClient, names, pattern, force, links, volumes, limit, dryRun)
+	removeCommand, err := docker.NewRemoveCommand(chaos.DockerClient, message)
 	if err != nil {
 		return err
 	}
 	// run remove command
-	return chaos.RunChaosCommand(cmd.context, removeCommand, interval, random)
+	return chaos.RunChaosCommand(cmd.context, removeCommand, message.Interval, message.Random)
 }
