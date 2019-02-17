@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/alexei-led/pumba/pkg/chaos"
+	headlessCmd "github.com/alexei-led/pumba/pkg/chaos/cmd"
 	"github.com/alexei-led/pumba/pkg/chaos/docker/cmd"
 	netemCmd "github.com/alexei-led/pumba/pkg/chaos/netem/cmd"
 	"github.com/alexei-led/pumba/pkg/container"
@@ -279,6 +280,7 @@ func tlsConfig(c *cli.Context) (*tls.Config, error) {
 
 func initializeCLICommands() []cli.Command {
 	return []cli.Command{
+		*headlessCmd.NewServerCommand(topContext),
 		*cmd.NewKillCLICommand(topContext),
 		*cmd.NewStopCLICommand(topContext),
 		*cmd.NewPauseCLICommand(topContext),

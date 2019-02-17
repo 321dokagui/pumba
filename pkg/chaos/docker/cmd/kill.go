@@ -40,23 +40,24 @@ func NewKillCLICommand(ctx context.Context) *cli.Command {
 
 // KILL Command
 func (cmd *killContext) kill(c *cli.Context) error {
+	message := docker.KillMessage{}
 	// get random
-	random := c.GlobalBool("random")
+	message.Random = c.GlobalBool("random")
 	// get dry-run mode
-	dryRun := c.GlobalBool("dry-run")
+	message.DryRun = c.GlobalBool("dry-run")
 	// get interval
-	interval := c.GlobalString("interval")
+	message.Interval = c.GlobalString("interval")
 	// get names or pattern
-	names, pattern := chaos.GetNamesOrPattern(c)
+	message.Names, message.Pattern = chaos.GetNamesOrPattern(c)
 	// get signal
-	signal := c.String("signal")
+	message.Signal = c.String("signal")
 	// get limit for number of containers to kill
-	limit := c.Int("limit")
+	message.Limit = c.Int("limit")
 	// init kill command
-	killCommand, err := docker.NewKillCommand(chaos.DockerClient, names, pattern, signal, limit, dryRun)
+	killCommand, err := docker.NewKillCommand(chaos.DockerClient, message)
 	if err != nil {
 		return err
 	}
 	// run kill command
-	return chaos.RunChaosCommand(cmd.context, killCommand, interval, random)
+	return chaos.RunChaosCommand(cmd.context, killCommand, message.Interval, message.Random)
 }

@@ -16,20 +16,13 @@ func TestKillCommand_Run(t *testing.T) {
 		listError bool
 		killError bool
 	}
-	type fields struct {
-		names   []string
-		pattern string
-		signal  string
-		limit   int
-		dryRun  bool
-	}
 	type args struct {
 		ctx    context.Context
 		random bool
 	}
 	tests := []struct {
 		name     string
-		fields   fields
+		message  KillMessage
 		args     args
 		expected []container.Container
 		wantErr  bool
@@ -37,9 +30,9 @@ func TestKillCommand_Run(t *testing.T) {
 	}{
 		{
 			name: "kill matching containers by names",
-			fields: fields{
-				names:  []string{"c1", "c2", "c3"},
-				signal: "SIGKILL",
+			message: KillMessage{
+				Names:  []string{"c1", "c2", "c3"},
+				Signal: "SIGKILL",
 			},
 			args: args{
 				ctx: context.TODO(),
@@ -48,10 +41,10 @@ func TestKillCommand_Run(t *testing.T) {
 		},
 		{
 			name: "kill matching containers by filter with limit",
-			fields: fields{
-				pattern: "^c?",
-				signal:  "SIGSTOP",
-				limit:   2,
+			message: KillMessage{
+				Pattern: "^c?",
+				Signal:  "SIGSTOP",
+				Limit:   2,
 			},
 			args: args{
 				ctx: context.TODO(),
@@ -60,9 +53,9 @@ func TestKillCommand_Run(t *testing.T) {
 		},
 		{
 			name: "kill random matching container by names",
-			fields: fields{
-				names:  []string{"c1", "c2", "c3"},
-				signal: "SIGKILL",
+			message: KillMessage{
+				Names:  []string{"c1", "c2", "c3"},
+				Signal: "SIGKILL",
 			},
 			args: args{
 				ctx:    context.TODO(),
@@ -72,9 +65,9 @@ func TestKillCommand_Run(t *testing.T) {
 		},
 		{
 			name: "no matching containers by names",
-			fields: fields{
-				names:  []string{"c1", "c2", "c3"},
-				signal: "SIGKILL",
+			message: KillMessage{
+				Names:  []string{"c1", "c2", "c3"},
+				Signal: "SIGKILL",
 			},
 			args: args{
 				ctx: context.TODO(),
@@ -82,9 +75,9 @@ func TestKillCommand_Run(t *testing.T) {
 		},
 		{
 			name: "error listing containers",
-			fields: fields{
-				names:  []string{"c1", "c2", "c3"},
-				signal: "SIGKILL",
+			message: KillMessage{
+				Names:  []string{"c1", "c2", "c3"},
+				Signal: "SIGKILL",
 			},
 			args: args{
 				ctx: context.TODO(),
@@ -94,9 +87,9 @@ func TestKillCommand_Run(t *testing.T) {
 		},
 		{
 			name: "error killing container",
-			fields: fields{
-				names:  []string{"c1", "c2", "c3"},
-				signal: "SIGKILL",
+			message: KillMessage{
+				Names:  []string{"c1", "c2", "c3"},
+				Signal: "SIGKILL",
 			},
 			args: args{
 				ctx: context.TODO(),
@@ -110,12 +103,8 @@ func TestKillCommand_Run(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := new(container.MockClient)
 			k := &KillCommand{
-				client:  mockClient,
-				names:   tt.fields.names,
-				pattern: tt.fields.pattern,
-				signal:  tt.fields.signal,
-				limit:   tt.fields.limit,
-				dryRun:  tt.fields.dryRun,
+				tt.message,
+				mockClient,
 			}
 			call := mockClient.On("ListContainers", tt.args.ctx, mock.AnythingOfType("container.Filter"))
 			if tt.errs.listError {
@@ -128,11 +117,11 @@ func TestKillCommand_Run(t *testing.T) {
 				}
 			}
 			if tt.args.random {
-				mockClient.On("KillContainer", tt.args.ctx, mock.AnythingOfType("container.Container"), tt.fields.signal, tt.fields.dryRun).Return(nil)
+				mockClient.On("KillContainer", tt.args.ctx, mock.AnythingOfType("container.Container"), tt.message.Signal, tt.message.DryRun).Return(nil)
 			} else {
 				for i := range tt.expected {
-					if tt.fields.limit == 0 || i < tt.fields.limit {
-						call = mockClient.On("KillContainer", tt.args.ctx, mock.AnythingOfType("container.Container"), tt.fields.signal, tt.fields.dryRun)
+					if tt.message.Limit == 0 || i < tt.message.Limit {
+						call = mockClient.On("KillContainer", tt.args.ctx, mock.AnythingOfType("container.Container"), tt.message.Signal, tt.message.DryRun)
 						if tt.errs.killError {
 							call.Return(errors.New("ERROR"))
 							goto Invoke
@@ -152,56 +141,54 @@ func TestKillCommand_Run(t *testing.T) {
 }
 
 func TestNewKillCommand(t *testing.T) {
-	type args struct {
-		client  container.Client
-		names   []string
-		pattern string
-		signal  string
-		limit   int
-		dryRun  bool
-	}
 	tests := []struct {
 		name    string
-		args    args
+		msg     KillMessage
 		want    chaos.Command
 		wantErr bool
 	}{
 		{
 			name: "create new kill command",
-			args: args{
-				names:  []string{"c1", "c2"},
-				signal: "SIGTERM",
-				limit:  10,
+			msg: KillMessage{
+				Names:  []string{"c1", "c2"},
+				Signal: "SIGTERM",
+				Limit:  10,
 			},
 			want: &KillCommand{
-				names:  []string{"c1", "c2"},
-				signal: "SIGTERM",
-				limit:  10,
+				KillMessage{
+					Names:  []string{"c1", "c2"},
+					Signal: "SIGTERM",
+					Limit:  10,
+				},
+				nil,
 			},
 		},
 		{
 			name: "invalid signal",
-			args: args{
-				names:  []string{"c1", "c2"},
-				signal: "SIGNONE",
+			msg: KillMessage{
+				Names:  []string{"c1", "c2"},
+				Signal: "SIGNONE",
 			},
 			wantErr: true,
 		},
 		{
 			name: "empty signal",
-			args: args{
-				names:  []string{"c1", "c2"},
-				signal: "",
+			msg: KillMessage{
+				Names:  []string{"c1", "c2"},
+				Signal: "",
 			},
 			want: &KillCommand{
-				names:  []string{"c1", "c2"},
-				signal: DefaultKillSignal,
+				KillMessage{
+					Names:  []string{"c1", "c2"},
+					Signal: DefaultKillSignal,
+				},
+				nil,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewKillCommand(tt.args.client, tt.args.names, tt.args.pattern, tt.args.signal, tt.args.limit, tt.args.dryRun)
+			got, err := NewKillCommand(nil, tt.msg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewKillCommand() error = %v, wantErr %v", err, tt.wantErr)
 				return

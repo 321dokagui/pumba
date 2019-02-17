@@ -49,24 +49,31 @@ var LinuxSignals = map[string]int{
 	"SIGPWR":    30,
 }
 
+// KillCommand message
+type KillMessage struct {
+	Random   bool     `json:"random,omitempty"`
+	DryRun   bool     `json:"dry-run,omitempty"`
+	Interval string   `json:"interval,omitempty"`
+	Pattern  string   `json:"pattern,omitempty"`
+	Names    []string `json:"names,omitempty"`
+	Signal   string   `json:"signal,omitempty"`
+	Limit    int      `json:"limit,omitempty"`
+}
+
 // KillCommand `docker kill` command
 type KillCommand struct {
-	client  container.Client
-	names   []string
-	pattern string
-	signal  string
-	limit   int
-	dryRun  bool
+	KillMessage
+	client container.Client
 }
 
 // NewKillCommand create new Kill Command instance
-func NewKillCommand(client container.Client, names []string, pattern string, signal string, limit int, dryRun bool) (chaos.Command, error) {
-	kill := &KillCommand{client, names, pattern, signal, limit, dryRun}
-	if kill.signal == "" {
-		kill.signal = DefaultKillSignal
+func NewKillCommand(client container.Client, msg KillMessage) (chaos.Command, error) {
+	kill := &KillCommand{msg, client}
+	if kill.Signal == "" {
+		kill.Signal = DefaultKillSignal
 	}
-	if _, ok := LinuxSignals[kill.signal]; !ok {
-		err := fmt.Errorf("undefined Linux signal: %s", signal)
+	if _, ok := LinuxSignals[kill.Signal]; !ok {
+		err := fmt.Errorf("undefined Linux signal: %s", kill.Signal)
 		log.WithError(err).Error("bad value for Linux signal")
 		return nil, err
 	}
@@ -77,11 +84,11 @@ func NewKillCommand(client container.Client, names []string, pattern string, sig
 func (k *KillCommand) Run(ctx context.Context, random bool) error {
 	log.Debug("killing all matching containers")
 	log.WithFields(log.Fields{
-		"names":   k.names,
-		"pattern": k.pattern,
-		"limit":   k.limit,
+		"names":   k.Names,
+		"pattern": k.Pattern,
+		"limit":   k.Limit,
 	}).Debug("listing matching containers")
-	containers, err := container.ListNContainers(ctx, k.client, k.names, k.pattern, k.limit)
+	containers, err := container.ListNContainers(ctx, k.client, k.Names, k.Pattern, k.Limit)
 	if err != nil {
 		log.WithError(err).Error("failed to list containers")
 		return err
@@ -92,7 +99,7 @@ func (k *KillCommand) Run(ctx context.Context, random bool) error {
 	}
 
 	// select single random container from matching container and replace list with selected item
-	if random {
+	if k.Random {
 		log.Debug("selecting single random container")
 		if c := container.RandomContainer(containers); c != nil {
 			containers = []container.Container{*c}
@@ -102,9 +109,9 @@ func (k *KillCommand) Run(ctx context.Context, random bool) error {
 	for _, container := range containers {
 		log.WithFields(log.Fields{
 			"container": container,
-			"signal":    k.signal,
+			"signal":    k.Signal,
 		}).Debug("killing container")
-		err := k.client.KillContainer(ctx, container, k.signal, k.dryRun)
+		err := k.client.KillContainer(ctx, container, k.Signal, k.DryRun)
 		if err != nil {
 			log.WithError(err).Error("failed to kill container")
 			return err

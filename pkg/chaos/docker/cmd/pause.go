@@ -45,7 +45,7 @@ func (cmd *pauseContext) pause(c *cli.Context) error {
 	dryRun := c.GlobalBool("dry-run")
 	// get global chaos interval
 	interval := c.GlobalString("interval")
-	// get limit for number of containers to kill
+	// get limit for number of containers to pause
 	limit := c.Int("limit")
 	// get names or pattern
 	names, pattern := chaos.GetNamesOrPattern(c)
