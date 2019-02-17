@@ -39,23 +39,24 @@ func NewPauseCLICommand(ctx context.Context) *cli.Command {
 
 // PAUSE Command
 func (cmd *pauseContext) pause(c *cli.Context) error {
+	message := docker.PauseMessage{}
 	// get random flag
-	random := c.GlobalBool("random")
+	message.Random = c.GlobalBool("random")
 	// get dry-run mode
-	dryRun := c.GlobalBool("dry-run")
+	message.DryRun = c.GlobalBool("dry-run")
 	// get global chaos interval
-	interval := c.GlobalString("interval")
+	message.Interval = c.GlobalString("interval")
 	// get limit for number of containers to pause
-	limit := c.Int("limit")
+	message.Limit = c.Int("limit")
 	// get names or pattern
-	names, pattern := chaos.GetNamesOrPattern(c)
+	message.Names, message.Pattern = chaos.GetNamesOrPattern(c)
 	// get chaos command duration
-	duration := c.String("duration")
+	message.Duration = c.String("duration")
 	// init pause command
-	pauseCommand, err := docker.NewPauseCommand(chaos.DockerClient, names, pattern, interval, duration, limit, dryRun)
+	pauseCommand, err := docker.NewPauseCommand(chaos.DockerClient, message)
 	if err != nil {
 		return err
 	}
 	// run pause command
-	return chaos.RunChaosCommand(cmd.context, pauseCommand, interval, random)
+	return chaos.RunChaosCommand(cmd.context, pauseCommand, message.Interval, message.Random)
 }

@@ -49,7 +49,7 @@ var LinuxSignals = map[string]int{
 	"SIGPWR":    30,
 }
 
-// KillCommand message
+// KillMessage message
 type KillMessage struct {
 	Random   bool     `json:"random,omitempty"`
 	DryRun   bool     `json:"dry-run,omitempty"`
