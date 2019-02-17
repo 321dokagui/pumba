@@ -15,47 +15,54 @@ const (
 	DeafultWaitTime = 5
 )
 
+// StopMessage REST API message
+type StopMessage struct {
+	Random   bool     `json:"random,omitempty"`
+	DryRun   bool     `json:"dry-run,omitempty"`
+	Interval string   `json:"interval,omitempty"`
+	Pattern  string   `json:"pattern,omitempty"`
+	Names    []string `json:"names,omitempty"`
+	Restart  bool     `json:"restart,omitempty"`
+	Duration string   `json:"duration,omitempty"`
+	WaitTime int      `json:"wait-time,omitempty"`
+	Limit    int      `json:"limit,omitempty"`
+}
+
 // StopCommand `docker stop` command
 type StopCommand struct {
-	client   container.Client
-	names    []string
-	pattern  string
-	restart  bool
-	duration time.Duration
-	waitTime int
-	limit    int
-	dryRun   bool
+	StopMessage
+	client container.Client
 }
 
 // NewStopCommand create new Stop Command instance
-func NewStopCommand(client container.Client, names []string, pattern string, restart bool, intervalStr string, durationStr string, waitTime int, limit int, dryRun bool) (chaos.Command, error) {
-	if waitTime <= 0 {
-		waitTime = DeafultWaitTime
+func NewStopCommand(client container.Client, msg StopMessage) (chaos.Command, error) {
+	if msg.WaitTime <= 0 {
+		msg.WaitTime = DeafultWaitTime
 	}
 	// get interval
-	interval, err := util.GetIntervalValue(intervalStr)
+	interval, err := util.GetIntervalValue(msg.Interval)
 	if err != nil {
 		return nil, err
 	}
-	// get duration
-	duration, err := util.GetDurationValue(durationStr, interval)
+	// validate duration vs interval
+	_, err = util.GetDurationValue(msg.Duration, interval)
 	if err != nil {
 		return nil, err
 	}
-	return &StopCommand{client, names, pattern, restart, duration, waitTime, limit, dryRun}, nil
+	return &StopCommand{msg, client}, nil
 }
 
 // Run stop command
 func (s *StopCommand) Run(ctx context.Context, random bool) error {
 	log.Debug("stopping all matching containers")
 	log.WithFields(log.Fields{
-		"names":    s.names,
-		"pattern":  s.pattern,
-		"duration": s.duration,
-		"waitTime": s.waitTime,
-		"limit":    s.limit,
+		"names":    s.Names,
+		"pattern":  s.Pattern,
+		"duration": s.Duration,
+		"waitTime": s.WaitTime,
+		"limit":    s.Limit,
 	}).Debug("listing matching containers")
-	containers, err := container.ListNContainers(ctx, s.client, s.names, s.pattern, s.limit)
+	containers, err := container.ListNContainers(ctx, s.client, s.Names, s.Pattern, s.Limit)
 	if err != nil {
 		log.WithError(err).Error("failed to list containers")
 		return err
@@ -65,8 +72,11 @@ func (s *StopCommand) Run(ctx context.Context, random bool) error {
 		return nil
 	}
 
+	// get duration, error is already checked
+	duration, _ := time.ParseDuration(s.Duration)
+
 	// select single random container from matching container and replace list with selected item
-	if random {
+	if s.Random {
 		log.Debug("selecting single random container")
 		if c := container.RandomContainer(containers); c != nil {
 			containers = []container.Container{*c}
@@ -79,9 +89,9 @@ func (s *StopCommand) Run(ctx context.Context, random bool) error {
 	for _, container := range containers {
 		log.WithFields(log.Fields{
 			"container": container,
-			"waitTime":  s.waitTime,
+			"waitTime":  s.WaitTime,
 		}).Debug("stopping container")
-		err = s.client.StopContainer(ctx, container, s.waitTime, s.dryRun)
+		err = s.client.StopContainer(ctx, container, s.WaitTime, s.DryRun)
 		if err != nil {
 			log.WithError(err).Error("failed to stop container")
 			break
@@ -90,15 +100,15 @@ func (s *StopCommand) Run(ctx context.Context, random bool) error {
 	}
 
 	// if there are stopped containers and want to (re)start ...
-	if len(stoppedContainers) > 0 && s.restart {
+	if len(stoppedContainers) > 0 && s.Restart {
 		// wait for specified duration and then unpause containers or unpause on ctx.Done()
 		select {
 		case <-ctx.Done():
 			log.Debug("start stopped containers by stop event")
 			// NOTE: use different context to stop netem since parent context is canceled
 			err = s.startStoppedContainers(context.Background(), stoppedContainers)
-		case <-time.After(s.duration):
-			log.WithField("duration", s.duration).Debug("start stopped containers after duration")
+		case <-time.After(duration):
+			log.WithField("duration", duration).Debug("start stopped containers after duration")
 			err = s.startStoppedContainers(ctx, stoppedContainers)
 		}
 	}
@@ -113,7 +123,7 @@ func (s *StopCommand) startStoppedContainers(ctx context.Context, containers []c
 	var err error
 	for _, container := range containers {
 		log.WithField("container", container).Debug("start stopped container")
-		if e := s.client.StartContainer(ctx, container, s.dryRun); e != nil {
+		if e := s.client.StartContainer(ctx, container, s.DryRun); e != nil {
 			log.WithError(e).Error("failed to start stopped container")
 			err = e
 		}

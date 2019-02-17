@@ -49,27 +49,28 @@ func NewStopCLICommand(ctx context.Context) *cli.Command {
 
 // STOP Command
 func (cmd *stopContext) stop(c *cli.Context) error {
+	message := docker.StopMessage{}
 	// get random flag
-	random := c.GlobalBool("random")
+	message.Random = c.GlobalBool("random")
 	// get dry-run mode
-	dryRun := c.GlobalBool("dry-run")
+	message.DryRun = c.GlobalBool("dry-run")
 	// get global chaos interval
-	interval := c.GlobalString("interval")
+	message.Interval = c.GlobalString("interval")
 	// get wait time
-	waitTime := c.Int("time")
+	message.WaitTime = c.Int("time")
 	// get limit for number of containers to kill
-	limit := c.Int("limit")
+	message.Limit = c.Int("limit")
 	// get names or pattern
-	names, pattern := chaos.GetNamesOrPattern(c)
+	message.Names, message.Pattern = chaos.GetNamesOrPattern(c)
 	// get restart flag
-	restart := c.Bool("restart")
+	message.Restart = c.Bool("restart")
 	// get chaos command duration
-	duration := c.String("duration")
+	message.Duration = c.String("duration")
 	// init stop command
-	stopCommand, err := docker.NewStopCommand(chaos.DockerClient, names, pattern, restart, interval, duration, waitTime, limit, dryRun)
+	stopCommand, err := docker.NewStopCommand(chaos.DockerClient, message)
 	if err != nil {
 		return err
 	}
 	// run stop command
-	return chaos.RunChaosCommand(cmd.context, stopCommand, interval, random)
+	return chaos.RunChaosCommand(cmd.context, stopCommand, message.Interval, message.Random)
 }

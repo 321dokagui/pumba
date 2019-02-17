@@ -65,7 +65,7 @@ func (p *PauseCommand) Run(ctx context.Context, random bool) error {
 	duration, _ := time.ParseDuration(p.Duration)
 
 	// select single random container from matching container and replace list with selected item
-	if random {
+	if p.Random {
 		log.Debug("selecting single random container")
 		if c := container.RandomContainer(containers); c != nil {
 			containers = []container.Container{*c}

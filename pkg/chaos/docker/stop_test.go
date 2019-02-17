@@ -5,7 +5,6 @@ import (
 	"errors"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/alexei-led/pumba/pkg/chaos"
 	"github.com/alexei-led/pumba/pkg/container"
@@ -13,64 +12,60 @@ import (
 )
 
 func TestNewStopCommand(t *testing.T) {
-	type args struct {
-		client   container.Client
-		names    []string
-		pattern  string
-		restart  bool
-		interval string
-		duration string
-		waitTime int
-		limit    int
-		dryRun   bool
-	}
 	tests := []struct {
 		name    string
-		args    args
+		msg     StopMessage
 		want    chaos.Command
 		wantErr bool
 	}{
 		{
 			name: "new stop command",
-			args: args{
-				names:    []string{"c1", "c2"},
-				pattern:  "pattern",
-				restart:  true,
-				interval: "20s",
-				duration: "10s",
-				waitTime: 100,
-				limit:    15,
+			msg: StopMessage{
+				Names:    []string{"c1", "c2"},
+				Pattern:  "pattern",
+				Restart:  true,
+				Interval: "20s",
+				Duration: "10s",
+				WaitTime: 100,
+				Limit:    15,
 			},
 			want: &StopCommand{
-				names:    []string{"c1", "c2"},
-				pattern:  "pattern",
-				restart:  true,
-				duration: 10 * time.Second,
-				waitTime: 100,
-				limit:    15,
+				StopMessage{
+					Names:    []string{"c1", "c2"},
+					Pattern:  "pattern",
+					Restart:  true,
+					Interval: "20s",
+					Duration: "10s",
+					WaitTime: 100,
+					Limit:    15,
+				},
+				nil,
 			},
 		},
 		{
 			name: "new stop command with default wait",
-			args: args{
-				names:    []string{"c1", "c2"},
-				pattern:  "pattern",
-				duration: "10s",
-				waitTime: 0,
-				limit:    15,
+			msg: StopMessage{
+				Names:    []string{"c1", "c2"},
+				Pattern:  "pattern",
+				Duration: "10s",
+				WaitTime: 0,
+				Limit:    15,
 			},
 			want: &StopCommand{
-				names:    []string{"c1", "c2"},
-				pattern:  "pattern",
-				duration: 10 * time.Second,
-				waitTime: DeafultWaitTime,
-				limit:    15,
+				StopMessage{
+					Names:    []string{"c1", "c2"},
+					Pattern:  "pattern",
+					Duration: "10s",
+					WaitTime: DeafultWaitTime,
+					Limit:    15,
+				},
+				nil,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewStopCommand(tt.args.client, tt.args.names, tt.args.pattern, tt.args.restart, tt.args.interval, tt.args.duration, tt.args.waitTime, tt.args.limit, tt.args.dryRun)
+			got, err := NewStopCommand(nil, tt.msg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewStopCommand() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -88,131 +83,101 @@ func TestStopCommand_Run(t *testing.T) {
 		stopError  bool
 		startError bool
 	}
-	type fields struct {
-		names    []string
-		pattern  string
-		restart  bool
-		waitTime int
-		limit    int
-		dryRun   bool
-	}
-	type args struct {
-		ctx    context.Context
-		random bool
-	}
 	tests := []struct {
 		name     string
-		fields   fields
-		args     args
+		msg      StopMessage
+		ctx      context.Context
 		expected []container.Container
 		wantErr  bool
 		errs     wantErrors
 	}{
 		{
 			name: "stop matching containers by names",
-			fields: fields{
-				names:    []string{"c1", "c2", "c3"},
-				waitTime: 20,
+			msg: StopMessage{
+				Names:    []string{"c1", "c2", "c3"},
+				WaitTime: 20,
 			},
-			args: args{
-				ctx: context.TODO(),
-			},
+			ctx:      context.TODO(),
 			expected: container.CreateTestContainers(3),
 		},
 		{
 			name: "stop matching containers by names and restart",
-			fields: fields{
-				names:    []string{"c1", "c2", "c3"},
-				waitTime: 20,
-				restart:  true,
+			msg: StopMessage{
+				Names:    []string{"c1", "c2", "c3"},
+				WaitTime: 20,
+				Restart:  true,
 			},
-			args: args{
-				ctx: context.TODO(),
-			},
+			ctx:      context.TODO(),
 			expected: container.CreateTestContainers(3),
 		},
 		{
 			name: "stop matching containers by filter with limit",
-			fields: fields{
-				pattern:  "^c?",
-				waitTime: 20,
-				limit:    2,
+			msg: StopMessage{
+				Pattern:  "^c?",
+				WaitTime: 20,
+				Limit:    2,
 			},
-			args: args{
-				ctx: context.TODO(),
-			},
+			ctx:      context.TODO(),
 			expected: container.CreateTestContainers(3),
 		},
 		{
 			name: "stop random matching container by names",
-			fields: fields{
-				names:    []string{"c1", "c2", "c3"},
-				waitTime: 20,
+			msg: StopMessage{
+				Names:    []string{"c1", "c2", "c3"},
+				WaitTime: 20,
+				Random:   true,
 			},
-			args: args{
-				ctx:    context.TODO(),
-				random: true,
-			},
+			ctx:      context.TODO(),
 			expected: container.CreateTestContainers(3),
 		},
 		{
 			name: "stop random matching container by names and restart",
-			fields: fields{
-				names:    []string{"c1", "c2", "c3"},
-				waitTime: 20,
-				restart:  true,
+			msg: StopMessage{
+				Names:    []string{"c1", "c2", "c3"},
+				WaitTime: 20,
+				Restart:  true,
+				Random:   true,
 			},
-			args: args{
-				ctx:    context.TODO(),
-				random: true,
-			},
+			ctx:      context.TODO(),
 			expected: container.CreateTestContainers(3),
 		},
 		{
 			name: "no matching containers by names",
-			fields: fields{
-				names:    []string{"c1", "c2", "c3"},
-				waitTime: 20,
+			msg: StopMessage{
+				Names:    []string{"c1", "c2", "c3"},
+				WaitTime: 20,
 			},
-			args: args{
-				ctx: context.TODO(),
-			},
+			ctx: context.TODO(),
 		},
 		{
 			name: "error listing containers",
-			fields: fields{
-				names:    []string{"c1", "c2", "c3"},
-				waitTime: 0,
+			msg: StopMessage{
+				Names:    []string{"c1", "c2", "c3"},
+				WaitTime: 0,
 			},
-			args: args{
-				ctx: context.TODO(),
-			},
+			ctx:     context.TODO(),
 			wantErr: true,
 			errs:    wantErrors{listError: true},
 		},
 		{
 			name: "error stopping container",
-			fields: fields{
-				names:    []string{"c1", "c2", "c3"},
-				waitTime: 20,
+			msg: StopMessage{
+				Names:    []string{"c1", "c2", "c3"},
+				WaitTime: 20,
 			},
-			args: args{
-				ctx: context.TODO(),
-			},
+			ctx:      context.TODO(),
 			expected: container.CreateTestContainers(3),
 			wantErr:  true,
 			errs:     wantErrors{stopError: true},
 		},
 		{
 			name: "error starting stopped container",
-			fields: fields{
-				names:    []string{"c1", "c2", "c3"},
-				waitTime: 20,
-				restart:  true,
+			msg: StopMessage{
+				Names:    []string{"c1", "c2", "c3"},
+				WaitTime: 20,
+				Restart:  true,
 			},
-			args: args{
-				ctx: context.TODO(),
-			},
+			ctx:      context.TODO(),
 			expected: container.CreateTestContainers(3),
 			wantErr:  true,
 			errs:     wantErrors{startError: true},
@@ -221,16 +186,8 @@ func TestStopCommand_Run(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := new(container.MockClient)
-			s := &StopCommand{
-				client:   mockClient,
-				names:    tt.fields.names,
-				pattern:  tt.fields.pattern,
-				restart:  tt.fields.restart,
-				waitTime: tt.fields.waitTime,
-				limit:    tt.fields.limit,
-				dryRun:   tt.fields.dryRun,
-			}
-			call := mockClient.On("ListContainers", tt.args.ctx, mock.AnythingOfType("container.Filter"))
+			s := &StopCommand{tt.msg, mockClient}
+			call := mockClient.On("ListContainers", tt.ctx, mock.AnythingOfType("container.Filter"))
 			if tt.errs.listError {
 				call.Return(tt.expected, errors.New("ERROR"))
 				goto Invoke
@@ -240,23 +197,23 @@ func TestStopCommand_Run(t *testing.T) {
 					goto Invoke
 				}
 			}
-			if tt.args.random {
-				mockClient.On("StopContainer", tt.args.ctx, mock.AnythingOfType("container.Container"), tt.fields.waitTime, tt.fields.dryRun).Return(nil)
-				if tt.fields.restart {
-					mockClient.On("StartContainer", tt.args.ctx, mock.AnythingOfType("container.Container"), tt.fields.dryRun).Return(nil)
+			if tt.msg.Random {
+				mockClient.On("StopContainer", tt.ctx, mock.AnythingOfType("container.Container"), tt.msg.WaitTime, tt.msg.DryRun).Return(nil)
+				if tt.msg.Restart {
+					mockClient.On("StartContainer", tt.ctx, mock.AnythingOfType("container.Container"), tt.msg.DryRun).Return(nil)
 				}
 			} else {
 				for i := range tt.expected {
-					if tt.fields.limit == 0 || i < tt.fields.limit {
-						call = mockClient.On("StopContainer", tt.args.ctx, mock.AnythingOfType("container.Container"), tt.fields.waitTime, tt.fields.dryRun)
+					if tt.msg.Limit == 0 || i < tt.msg.Limit {
+						call = mockClient.On("StopContainer", tt.ctx, mock.AnythingOfType("container.Container"), tt.msg.WaitTime, tt.msg.DryRun)
 						if tt.errs.stopError {
 							call.Return(errors.New("ERROR"))
 							goto Invoke
 						} else {
 							call.Return(nil)
 						}
-						if tt.fields.restart {
-							call = mockClient.On("StartContainer", tt.args.ctx, mock.AnythingOfType("container.Container"), tt.fields.dryRun)
+						if tt.msg.Restart {
+							call = mockClient.On("StartContainer", tt.ctx, mock.AnythingOfType("container.Container"), tt.msg.DryRun)
 							if tt.errs.startError {
 								call.Return(errors.New("ERROR"))
 								goto Invoke
@@ -268,7 +225,7 @@ func TestStopCommand_Run(t *testing.T) {
 				}
 			}
 		Invoke:
-			if err := s.Run(tt.args.ctx, tt.args.random); (err != nil) != tt.wantErr {
+			if err := s.Run(tt.ctx, tt.msg.Random); (err != nil) != tt.wantErr {
 				t.Errorf("StopCommand.Run() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			mockClient.AssertExpectations(t)
